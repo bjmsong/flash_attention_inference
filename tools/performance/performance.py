@@ -38,7 +38,7 @@ def draw_line_chart(methods, dims, data, figure_name, y_label, title):
     # plt.hlines(y=100, xmin=dims_str[0], xmax=dims_str[-1], colors='r', linestyles='-.')
     plt.grid(True, linestyle='-.')
 
-    plt.xlabel('Tensor Dimension / Seq', fontdict={'size': '30'})
+    plt.xlabel('Prompt Fraction / %', fontdict={'size': '30'})
     plt.ylabel(y_label, fontdict={'size': '30'})
     plt.title(title, fontdict={'size': '30'})
     plt.legend(methods, loc='best', prop={'size': '30'})
@@ -52,7 +52,7 @@ def read_data(methods, dims, data_path, log_files):
     data_performance = np.zeros((len(methods), len(dims)), np.float64)
 
     for log_file in log_files:
-        dim = int((log_file.split('.')[0]).split('_')[-3])
+        dim = int((log_file.split('.')[0]).split('_')[-1])
         with open(data_path + log_file) as fp:
             line = fp.readline()
             while line:
@@ -73,7 +73,7 @@ def get_dims(log_files):
     dims = []
 
     for log_file in log_files:
-        dims.append(int((log_file.split('.')[0]).split('_')[-3]))
+        dims.append(int((log_file.split('.')[0]).split('_')[-1]))
 
     dims.sort()
 

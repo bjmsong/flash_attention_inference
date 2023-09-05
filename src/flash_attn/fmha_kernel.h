@@ -50,6 +50,7 @@ struct BlockInfoPadded {
         actual_seqlen_q = params.cu_seqlens_q[bidb + 1] - sum_s_q;
 
         tidx_global = (bidb * params.h + bidh) * THREADS_PER_CTA + tidx;
+        row_shift = actual_seqlen_k - actual_seqlen_q;
     }
 
     __device__ bool stop_early(const int start_col = 0) const {
@@ -65,6 +66,7 @@ struct BlockInfoPadded {
     int bidb;
     int tidx_global;
     int h;
+    int row_shift;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

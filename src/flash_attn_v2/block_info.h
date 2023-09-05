@@ -17,7 +17,8 @@ struct BlockInfo {
           actual_seqlen_q(!Varlen || params.cu_seqlens_q == nullptr ? params.seqlen_q
                                                                     : params.cu_seqlens_q[bidb + 1] - sum_s_q),
           actual_seqlen_k(!Varlen || params.cu_seqlens_k == nullptr ? params.seqlen_k
-                                                                    : params.cu_seqlens_k[bidb + 1] - sum_s_k) {}
+                                                                    : params.cu_seqlens_k[bidb + 1] - sum_s_k),
+          row_shift(actual_seqlen_k - actual_seqlen_q) {}
 
     template <typename index_t>
     inline __device__ index_t q_offset(const index_t batch_stride, const index_t row_stride, const int bidb) const {
@@ -33,6 +34,7 @@ struct BlockInfo {
     const int sum_s_k;
     const int actual_seqlen_q;
     const int actual_seqlen_k;
+    const int row_shift;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

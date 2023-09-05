@@ -8,6 +8,7 @@ O = Softmax(Q * K^T) * V
 
 # Support
 - GQA/MQA Inference: Group Query Attention / Multi Query Attention Inference
+- Hybrid Inference: Hybrid Inference by Prompt and Generator
 
 # Compile
 ## Environment
@@ -92,16 +93,21 @@ The Flash Attention performance is better regardless of the size of the Batch.
 
 ![generator_batch](./performance/RTX3090/generator_batch.png)
 
+### Hybrid
+Regardless of the ratio of Prompt to Generator, Flash Attention and Flash Attention v2 are similar in performance.
+- Batch Size: 100
+- Seq Q: 128
+- Seq K: 128
+
+![hybrid](./performance/RTX3090/hybrid.png)
+
 # Reference
-## flash-attention
-https://github.com/Dao-AILab/flash-attention
+## [flash-attention](https://github.com/Dao-AILab/flash-attention)
 - flash attention: v1.0.9
 - flash attention v2: v2.1.0
 
-## cutlass
-https://github.com/NVIDIA/cutlass
+## [cutlass](https://github.com/NVIDIA/cutlass)
 - cutlass: v3.1.0
 
 # TODO
-- Hybrid Inference
 - ALiBi Inference

@@ -35,7 +35,9 @@ struct Mask {
 
     template <typename BInfo>
     __device__ Mask(const BInfo &binfo, int tidx, const int loop_step_idx_ = 0)
-        : actual_seqlen_k(binfo.actual_seqlen_k - loop_step_idx_ * Cta_tile::N), loop_step_idx(loop_step_idx_) {
+        : actual_seqlen_k(binfo.actual_seqlen_k - loop_step_idx_ * Cta_tile::N),
+          loop_step_idx(loop_step_idx_),
+          row_shift(binfo.row_shift) {
         const int warp = tidx / Cta_tile::THREADS_PER_WARP;
         const int lane = tidx % Cta_tile::THREADS_PER_WARP;
 
@@ -65,7 +67,9 @@ struct Mask {
         //     printf("current_col=%d, current_row=%d, actual_seqlen_k=%d, col_valid=%d, all_valid=%d\n", current_col,
         //     current_row, actual_seqlen_k, col_valid, all_valid);
         // }
-        return Is_causal ? col_valid && (current_col + loop_step_idx * Cta_tile::N <= current_row) : col_valid;
+        return (Is_causal && row_shift == 0)
+                   ? col_valid && (current_col + loop_step_idx * Cta_tile::N <= current_row + row_shift)
+                   : col_valid;
         // return row_valid && col_valid;
     }
 
@@ -83,6 +87,7 @@ struct Mask {
     int col;
     const int loop_step_idx;
     const int actual_seqlen_k;
+    int row_shift;
 };
 
 }  // namespace fmha

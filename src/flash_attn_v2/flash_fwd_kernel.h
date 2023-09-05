@@ -115,7 +115,7 @@ inline __device__ void compute_attn_1rowblock(const Params &params, const int bi
         return;
 
     int n_block_max = cute::ceil_div(binfo.actual_seqlen_k, kBlockN);
-    if (Is_causal) {
+    if (Is_causal && binfo.row_shift == 0) {
         n_block_max = std::min(
             n_block_max,
             cute::ceil_div((m_block + 1) * kBlockM + int(binfo.actual_seqlen_k - binfo.actual_seqlen_q), kBlockN));
@@ -334,8 +334,9 @@ inline __device__ void compute_attn_1rowblock(const Params &params, const int bi
 
     // If not even_N, then seqlen_k might end in the middle of a block. In that case we need to
     // mask 2 blocks (e.g. when kBlockM == kBlockN), not just 1.
-    constexpr int n_masking_steps =
-        !Is_causal ? 1 : (Is_even_MN ? cute::ceil_div(kBlockM, kBlockN) : cute::ceil_div(kBlockM, kBlockN) + 1);
+    int n_masking_steps = !(Is_causal && binfo.row_shift == 0)
+                              ? 1
+                              : (Is_even_MN ? cute::ceil_div(kBlockM, kBlockN) : cute::ceil_div(kBlockM, kBlockN) + 1);
 #pragma unroll
     for (int masking_step = 0; masking_step < n_masking_steps; ++masking_step, --n_block) {
         Tensor acc_s = partition_fragment_C(tiled_mma, Shape<Int<kBlockM>, Int<kBlockN>>{});  // (MMA=4, MMA_M, MMA_N)
@@ -365,7 +366,7 @@ inline __device__ void compute_attn_1rowblock(const Params &params, const int bi
         // We don't put the masking before the matmul S = Q K^T because we don't clear sK
         // for rows outside actual_seqlen_k. So those rows could have Inf / NaN, and the matmul
         // can produce Inf / NaN.
-        if (!Is_causal) {
+        if (!(Is_causal && binfo.row_shift == 0)) {
             if (!Is_even_MN) {
                 flash::apply_mask(scores, binfo.actual_seqlen_k - n_block * kBlockN);
             }

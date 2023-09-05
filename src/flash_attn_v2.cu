@@ -15,14 +15,11 @@ void run_mha_fwd(Flash_fwd_params &params, cudaStream_t stream) {
 }
 
 Flash_fwd_params set_mha_fwd_params(Tensor<cutlass::half_t> *Q, Tensor<cutlass::half_t> *K, Tensor<cutlass::half_t> *V,
-                                    Tensor<cutlass::half_t> *O, int *cu_seq_q, int *cu_seq_k, bool is_causal,
-                                    cudaDeviceProp *dev_prop) {
-    size_t batch = Q->getShape()[0];
-    size_t seq_q = Q->getShape()[1];
-    size_t head_q = Q->getShape()[2];
-    size_t dim = Q->getShape()[3];
-    size_t seq_k = K->getShape()[1];
-    size_t head_k = K->getShape()[2];
+                                    Tensor<cutlass::half_t> *O, int *cu_seq_q, int *cu_seq_k, size_t batch,
+                                    size_t max_seq_q, size_t max_seq_k, bool is_causal, cudaDeviceProp *dev_prop) {
+    size_t head_q = Q->getShape()[1];
+    size_t dim = Q->getShape()[2];
+    size_t head_k = K->getShape()[1];
 
     FAI_CHECK_LE(dim, 256);
     FAI_CHECK_GE(head_q, head_k);
@@ -38,15 +35,18 @@ Flash_fwd_params set_mha_fwd_params(Tensor<cutlass::half_t> *Q, Tensor<cutlass::
     params.k_ptr = reinterpret_cast<void *>(K->getDevPtr());
     params.v_ptr = reinterpret_cast<void *>(V->getDevPtr());
 
-    params.q_batch_stride = seq_q * head_q * dim;
+    // Calculate batch_stride using cu_seq
+    params.q_batch_stride = 0;
     params.q_row_stride = head_q * dim;
     params.q_head_stride = dim;
 
-    params.k_batch_stride = seq_k * head_k * dim;
+    // Calculate batch_stride using cu_seq
+    params.k_batch_stride = 0;
     params.k_row_stride = head_k * dim;
     params.k_head_stride = dim;
 
-    params.v_batch_stride = seq_k * head_k * dim;
+    // Calculate batch_stride using cu_seq
+    params.v_batch_stride = 0;
     params.v_row_stride = head_k * dim;
     params.v_head_stride = dim;
 
@@ -59,18 +59,19 @@ Flash_fwd_params set_mha_fwd_params(Tensor<cutlass::half_t> *Q, Tensor<cutlass::
 
     params.o_ptr = reinterpret_cast<void *>(O->getDevPtr());
 
-    params.o_batch_stride = seq_q * head_q * dim;
+    // Calculate batch_stride using cu_seq
+    params.o_batch_stride = 0;
     params.o_row_stride = head_q * dim;
     params.o_head_stride = dim;
 
     // Softmax sum
-    Tensor<float> *softmax_lse = new Tensor<float>({batch, head_q, seq_q});
+    Tensor<float> *softmax_lse = new Tensor<float>({batch, head_q, max_seq_q});
     params.softmax_lse_ptr = reinterpret_cast<void *>(softmax_lse->getDevPtr());
 
     // Set the dimensions.
     params.b = batch;
-    params.seqlen_q = seq_q;
-    params.seqlen_k = seq_k;
+    params.seqlen_q = max_seq_q;
+    params.seqlen_k = max_seq_k;
     params.d = dim;
 
     params.scale_softmax = 1.0 / sqrtf(dim);
@@ -85,8 +86,9 @@ Flash_fwd_params set_mha_fwd_params(Tensor<cutlass::half_t> *Q, Tensor<cutlass::
 }
 
 void flash_attn_v2(Tensor<cutlass::half_t> *Q, Tensor<cutlass::half_t> *K, Tensor<cutlass::half_t> *V,
-                   Tensor<cutlass::half_t> *O, int *cu_seq_q, int *cu_seq_k, bool is_causal, int num_splits,
-                   cudaDeviceProp *dev_prop) {
-    static Flash_fwd_params params = set_mha_fwd_params(Q, K, V, O, cu_seq_q, cu_seq_k, is_causal, dev_prop);
+                   Tensor<cutlass::half_t> *O, int *cu_seq_q, int *cu_seq_k, size_t batch, size_t max_seq_q,
+                   size_t max_seq_k, bool is_causal, int num_splits, cudaDeviceProp *dev_prop) {
+    static Flash_fwd_params params =
+        set_mha_fwd_params(Q, K, V, O, cu_seq_q, cu_seq_k, batch, max_seq_q, max_seq_k, is_causal, dev_prop);
     run_mha_fwd(params, nullptr);
 }

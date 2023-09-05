@@ -7,6 +7,9 @@
 #ifndef __FLASH_ATTENTION_INFERENCE_UTIL_H__
 #define __FLASH_ATTENTION_INFERENCE_UTIL_H__
 
+#include <string>
+#include <vector>
+
 #include "cuda_runtime_api.h"
 
 inline __device__ __host__ size_t div_ceil(size_t a, size_t b) {
@@ -76,6 +79,12 @@ inline const char *convert_SM_to_arch_name(int major, int minor) {
     FLOG("MapSMtoArchName for SM %d.%d is undefined. Default to use %s", major, minor, nGpuArchNameSM[index - 1].name);
 
     return nGpuArchNameSM[index - 1].name;
+}
+
+inline void print_vector(const std::vector<int> &vec, const std::string &name = "Vector") {
+    for (size_t i = 0; i < vec.size(); ++i) {
+        FLOG("%s[%zu]: %d", name.c_str(), i, vec[i]);
+    }
 }
 
 #endif  // __FLASH_ATTENTION_INFERENCE_UTIL_H__
