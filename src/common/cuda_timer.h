@@ -4,8 +4,7 @@
 //
 // Description: cuda timer
 
-#ifndef __FLASH_ATTENTION_INFERENCE_CUDA_TIMER_H__
-#define __FLASH_ATTENTION_INFERENCE_CUDA_TIMER_H__
+#pragma once
 
 #include "common.h"
 
@@ -49,5 +48,3 @@ private:
 
     FAI_DISALLOW_COPY_AND_ASSIGN(CudaTimer);
 };
-
-#endif  // __FLASH_ATTENTION_INFERENCE_CUDA_TIMER_H__

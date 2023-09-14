@@ -4,8 +4,7 @@
 //
 // Description: util function
 
-#ifndef __FLASH_ATTENTION_INFERENCE_UTIL_H__
-#define __FLASH_ATTENTION_INFERENCE_UTIL_H__
+#pragma once
 
 #include <string>
 #include <vector>
@@ -18,11 +17,9 @@ inline __device__ __host__ size_t div_ceil(size_t a, size_t b) {
 
 // Beginning of GPU Architecture definitions
 inline int convert_SM_to_cores(int major, int minor) {
-    // Defines for GPU Architecture types (using the SM version to determine
-    // the # of cores per SM
+    // Defines for GPU Architecture types (using the SM version to determine the # of cores per SM
     typedef struct {
-        int SM;  // 0xMm (hexidecimal notation), M = SM Major version,
-        // and m = SM minor version
+        int SM;  // 0xMm (hexidecimal notation), M = SM Major version, and m = SM minor version
         int cores;
     } sSMtoCores;
 
@@ -41,8 +38,7 @@ inline int convert_SM_to_cores(int major, int minor) {
         index++;
     }
 
-    // If we don't find the values, we default use the previous one
-    // to run properly
+    // If we don't find the values, we default use the previous one to run properly
     FLOG("MapSMtoCores for SM %d.%d is undefined. Default to use %d cores/SM", major, minor,
          nGpuArchCoresPerSM[index - 1].cores);
 
@@ -50,11 +46,9 @@ inline int convert_SM_to_cores(int major, int minor) {
 }
 
 inline const char *convert_SM_to_arch_name(int major, int minor) {
-    // Defines for GPU Architecture types (using the SM version to determine
-    // the GPU Arch name)
+    // Defines for GPU Architecture types (using the SM version to determine the GPU Arch name)
     typedef struct {
-        int SM;  // 0xMm (hexidecimal notation), M = SM Major version,
-        // and m = SM minor version
+        int SM;  // 0xMm (hexidecimal notation), M = SM Major version, and m = SM minor version
         const char *name;
     } sSMtoArchName;
 
@@ -74,8 +68,7 @@ inline const char *convert_SM_to_arch_name(int major, int minor) {
         index++;
     }
 
-    // If we don't find the values, we default use the previous one
-    // to run properly
+    // If we don't find the values, we default use the previous one to run properly
     FLOG("MapSMtoArchName for SM %d.%d is undefined. Default to use %s", major, minor, nGpuArchNameSM[index - 1].name);
 
     return nGpuArchNameSM[index - 1].name;
@@ -86,5 +79,3 @@ inline void print_vector(const std::vector<int> &vec, const std::string &name = 
         FLOG("%s[%zu]: %d", name.c_str(), i, vec[i]);
     }
 }
-
-#endif  // __FLASH_ATTENTION_INFERENCE_UTIL_H__

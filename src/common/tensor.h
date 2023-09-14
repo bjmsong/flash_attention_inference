@@ -4,8 +4,7 @@
 //
 // Description: tensor
 
-#ifndef __FLASH_ATTENTION_INFERENCE_TENSOR_H__
-#define __FLASH_ATTENTION_INFERENCE_TENSOR_H__
+#pragma once
 
 #include <random>
 
@@ -16,6 +15,11 @@ class Tensor {
 public:
     Tensor(const std::vector<size_t> &shape, const std::string &name = "Tensor", float min = -1.0, float max = 1.0)
         : m_shape(shape), m_name(name), m_min(min), m_max(max) {
+        FAI_CHECK_GT(shape.size(), 0);
+        for (size_t i = 0; i < shape.size(); ++i) {
+            FAI_CHECK_GT(shape[i], 0);
+        }
+
         m_elem_num = std::accumulate(m_shape.begin(), m_shape.end(), 1, std::multiplies<size_t>());
         FAI_CHECK_GT(m_elem_num, 0);
 
@@ -98,7 +102,7 @@ public:
 private:
     const std::vector<size_t> m_shape;
     const std::string m_name = "Tensor";
-    // the threshold of the random matrix will affect the difference of the attention results
+    // the threshold of the random tensor will affect the difference of the mha results
     const float m_min = -1.0;
     const float m_max = 1.0;
 
@@ -111,5 +115,3 @@ private:
 
     FAI_DISALLOW_COPY_AND_ASSIGN(Tensor);
 };
-
-#endif  // __FLASH_ATTENTION_INFERENCE_TENSOR_H__

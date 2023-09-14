@@ -4,17 +4,10 @@
 //
 // Description: common macro
 
-#ifndef __FLASH_ATTENTION_INFERENCE_COMMON_H__
-#define __FLASH_ATTENTION_INFERENCE_COMMON_H__
-
-#include <stdint.h>
-
-#include <algorithm>
+#pragma once
 
 #include "cuda_fp16.h"
-#include "cutlass/half.h"
 #include "logging.h"
-#include "mma.h"
 #include "util.h"
 
 #define FAI_LIKELY(x) __builtin_expect(!!(x), 1)
@@ -23,7 +16,7 @@
 #define FAI_CHECK(x)                      \
     do {                                  \
         if (FAI_UNLIKELY(!(x))) {         \
-            FLOG("check failed: %s", #x); \
+            FLOG("Check failed: %s", #x); \
             exit(EXIT_FAILURE);           \
         }                                 \
     } while (0)
@@ -53,5 +46,3 @@
             exit(EXIT_FAILURE);                                                                   \
         }                                                                                         \
     } while (0)
-
-#endif  // __FLASH_ATTENTION_INFERENCE_COMMON_H__
