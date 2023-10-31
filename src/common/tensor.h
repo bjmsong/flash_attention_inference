@@ -73,11 +73,23 @@ public:
         FAI_CHECK_EQ(m_elem_num, base->getElemNum());
 
         FAI_CHECK_CUDART_ERROR(
-            cudaMemcpy(m_dev_ptr, base->getHostPtr(), m_elem_num * sizeof(T), cudaMemcpyHostToDevice));
+            cudaMemcpy(m_dev_ptr, base->getDevPtr(), m_elem_num * sizeof(T), cudaMemcpyDeviceToDevice));
     }
 
     void moveToHost() {
         FAI_CHECK_CUDART_ERROR(cudaMemcpy(m_host_ptr, m_dev_ptr, m_elem_num * sizeof(T), cudaMemcpyDeviceToHost));
+    }
+
+    void moveToDevice() {
+        FAI_CHECK_CUDART_ERROR(cudaMemcpy(m_dev_ptr, m_host_ptr, m_elem_num * sizeof(T), cudaMemcpyHostToDevice));
+    }
+
+    void memSetHost() {
+        memset(m_host_ptr, 0, m_elem_num * sizeof(T));
+    }
+
+    void memSetDevice() {
+        FAI_CHECK_CUDART_ERROR(cudaMemset(m_dev_ptr, 0, m_elem_num * sizeof(T)));
     }
 
     void checkValue(Tensor<T> *base) {

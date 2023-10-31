@@ -1,15 +1,20 @@
 # Flash Attention Inference
-Performance of the C++ interface of flash attention and flash attention v2 in large language model (LLM) inference scenarios. The calculation expression is as follows, where the precision of tensor Q, K, V and O is FP16. Remove redundant code from flash attention that has nothing to do with inference, such as backward, dropout, bf16 and torch dependencies, so you can easily integrate flash attention into LLM inference programs.
+Performance of the C++ interface of flash attention and flash attention v2 in large language model (LLM) inference scenarios. The calculation expression is as follows, where the precision of tensor Q, K, V and O is FP16. Remove redundant code from flash attention that has nothing to do with inference, such as backward, dropout, bf16 and torch dependencies, so you can easily integrate flash attention into LLM inference programs. In addition, Flash Attention and Flash Attention v2 have been modified to support Group Query Attention (GQA) / Multi Query Attention (MQA), Hybrid by Prefill and Decoding and Attention with Linear Biases (ALiBi) inference scenarios.
 ```
 O = Softmax(Q * K^T) * V
 ```
 
-![mha](./media/images/mha.png)
+![mha_prefill](./media/images/mha_prefill.png)
+
+In order to solve the problem of low Tensor Core utilization of Flash Attention in the decoding stage of LLM inference, refer to OpenPPL and Flash Attention, and use the handwritten Decoding Attention operator of CUDA Core for optimization. The calculation expression is as follows, where the precision of tensor Q, K, V and O is FP16. In most LLM inference decoding scenarios, the performance of Decoding Attention is better than Flash Attention and Flash Attention v2. In addition, Decoding Attention also supports GQA / MQA and ALiBi inference scenarios.
+
+![mha_decoding](./media/images/mha_decoding.png)
 
 # Support
 - GQA/MQA Inference: Group Query Attention / Multi Query Attention Inference
 - Hybrid Inference: Hybrid Inference by Prefill and Decoding
 - ALiBi Inference: Attention with Linear Biases
+- Decoding Attention: Self Multi Head Attention of Decoding Stage with CUDA Core
 
 # Compile
 ## Environment
@@ -61,7 +66,7 @@ cd tools/performance
 - Head Dim: 128
 
 ### Prefill
-#### Seq
+#### Seq Len
 The performance of both is similar for short sequences and Flash Attention v2 performs well in long sequences. It can increase by about 50%.
 - Batch Size: 128
 - Seq Q: Seq Len
@@ -69,8 +74,8 @@ The performance of both is similar for short sequences and Flash Attention v2 pe
 
 ![prefill_seq_throughput](./performance/RTX3090/prefill_seq_throughput.png)
 
-#### Batch
-When the Batch is small, the Flash Attention v2 performance is better. When the Batch is large, the performance of the two kernels is comparable.
+#### Batch Size
+When the batch size is small, the Flash Attention v2 performance is better. When the batch size is large, the performance of the two kernels is comparable.
 - Batch Size: Batch Size
 - Seq Q: 128
 - Seq K: 128
@@ -78,16 +83,16 @@ When the Batch is small, the Flash Attention v2 performance is better. When the 
 ![prefill_batch_throughput](./performance/RTX3090/prefill_batch_throughput.png)
 
 ### Decoding
-#### Seq
-The performance of both is similar for short sequences and Flash Attention performs well in long sequences.
+#### Seq Len
+The performance of both is similar for short sequences and Flash Attention performs well in long sequences. Regardless of the size of seq len, Decoding Attention performance is better than Flash Attention and Flash Attention v2.
 - Batch Size: 128
 - Seq Q: 1
 - Seq K: Seq Len
 
 ![decoding_seq_throughput](./performance/RTX3090/decoding_seq_throughput.png)
 
-#### Batch
-The Flash Attention performance is better regardless of the size of the Batch.
+#### Batch Size
+The Flash Attention performance is better regardless of batch size. When the batch size is less than 4, the Decoding Attention performance is between Flash Attention and Flash Attention v2, when the batch size is greater than 4, the Decoding Attention performance is better than Flash Attention and Flash Attention v2.
 - Batch Size: Batch Size
 - Seq Q: 1
 - Seq K: 128

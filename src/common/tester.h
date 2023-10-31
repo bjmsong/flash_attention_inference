@@ -71,24 +71,20 @@ public:
         m_base = new Tensor<half>({m_total_q, m_head_q, m_dim}, "Tensor Base");
         FAI_CHECK(m_base);
 
-        get_cu_seq(m_cu_seq_q, m_batch, m_seq_q, true, m_is_hybrid, m_prefill_batch, m_decoding_batch);
-        // print_vector(m_cu_seq_q, "cu_seq_q");
-        FAI_CHECK_CUDART_ERROR(cudaMalloc((void **)&m_cu_seq_q_dev, m_cu_seq_q.size() * sizeof(int)));
-        FAI_CHECK(m_cu_seq_q_dev);
-        FAI_CHECK_CUDART_ERROR(
-            cudaMemcpy(m_cu_seq_q_dev, m_cu_seq_q.data(), m_cu_seq_q.size() * sizeof(int), cudaMemcpyHostToDevice));
+        m_cu_seq_q = new Tensor<int>({m_batch + 1}, "Tensor cu_seq_q");
+        FAI_CHECK(m_cu_seq_q);
+        m_cu_seq_k = new Tensor<int>({m_batch + 1}, "Tensor cu_seq_k");
+        FAI_CHECK(m_cu_seq_k);
 
-        get_cu_seq(m_cu_seq_k, m_batch, m_seq_k);
-        // print_vector(m_cu_seq_k, "cu_seq_k");
-        FAI_CHECK_CUDART_ERROR(cudaMalloc((void **)&m_cu_seq_k_dev, m_cu_seq_k.size() * sizeof(int)));
-        FAI_CHECK(m_cu_seq_k_dev);
-        FAI_CHECK_CUDART_ERROR(
-            cudaMemcpy(m_cu_seq_k_dev, m_cu_seq_k.data(), m_cu_seq_k.size() * sizeof(int), cudaMemcpyHostToDevice));
+        get_cu_seq(m_cu_seq_q, m_seq_q, true, m_is_hybrid, m_prefill_batch, m_decoding_batch);
+        m_cu_seq_q->moveToDevice();
+
+        get_cu_seq(m_cu_seq_k, m_seq_k);
+        m_cu_seq_k->moveToDevice();
 
         if (m_enable_check) {
             clock_t start = clock();
-            mha_cpu(m_Q, m_K, m_V, m_base, m_cu_seq_q.data(), m_cu_seq_k.data(), m_batch, m_seq_q, m_seq_k, m_is_causal,
-                    m_is_alibi);
+            mha_cpu(m_Q, m_K, m_V, m_base, m_cu_seq_q, m_cu_seq_k, m_seq_q, m_seq_k, m_is_causal, m_is_alibi);
             clock_t end = clock();
             FLOG("MHA CPU use: %.3f ms", static_cast<double>(end - start) / (CLOCKS_PER_SEC * 1e-3));
         }
@@ -120,14 +116,14 @@ public:
             m_base = nullptr;
         }
 
-        if (m_cu_seq_q_dev) {
-            FAI_CHECK_CUDART_ERROR(cudaFree((void *)m_cu_seq_q_dev));
-            m_cu_seq_q_dev = nullptr;
+        if (m_cu_seq_q) {
+            delete m_cu_seq_q;
+            m_cu_seq_q = nullptr;
         }
 
-        if (m_cu_seq_k_dev) {
-            FAI_CHECK_CUDART_ERROR(cudaFree((void *)m_cu_seq_k_dev));
-            m_cu_seq_k_dev = nullptr;
+        if (m_cu_seq_k) {
+            delete m_cu_seq_k;
+            m_cu_seq_k = nullptr;
         }
     }
 
@@ -140,8 +136,8 @@ public:
         // warm up
         m_cuda_timer.start();
         for (size_t i = 0; i < m_warmup_iterations; ++i) {
-            mha(m_Q, m_K, m_V, m_O, m_cu_seq_q_dev, m_cu_seq_k_dev, m_batch, m_seq_q, m_seq_k, m_is_causal,
-                m_num_splits, m_stream, m_dev_prop, m_is_alibi);
+            mha(m_Q, m_K, m_V, m_O, m_cu_seq_q, m_cu_seq_k, m_seq_q, m_seq_k, m_is_causal, m_num_splits, m_stream,
+                m_dev_prop, m_is_alibi);
         }
         m_warmup_time = static_cast<double>(m_cuda_timer.end()) / static_cast<double>(m_warmup_iterations);
         FLOG("Warm up time: %.3f ms", m_warmup_time);
@@ -155,30 +151,32 @@ public:
     }
 
 private:
-    void get_cu_seq(std::vector<int> &cu_seq, size_t batch, size_t seq, bool is_seq_q = false, bool is_hybrid = false,
+    void get_cu_seq(Tensor<int> *cu_seq, size_t seq, bool is_seq_q = false, bool is_hybrid = false,
                     size_t prefill_batch = 0, size_t decoding_batch = 0) {
-        cu_seq.resize(batch + 1);
+        size_t batch = cu_seq->getShape()[0] - 1;
+        int *cu_seq_ptr = cu_seq->getHostPtr();
         if (is_hybrid && is_seq_q) {
             FAI_CHECK_EQ(batch, prefill_batch + decoding_batch);
             for (size_t i = 0; i < decoding_batch + 1; ++i) {
-                cu_seq[i] = i;
+                cu_seq_ptr[i] = i;
             }
             for (size_t i = 1; i < prefill_batch + 1; ++i) {
-                cu_seq[decoding_batch + i] = cu_seq[decoding_batch] + i * seq;
+                cu_seq_ptr[decoding_batch + i] = cu_seq_ptr[decoding_batch] + i * seq;
             }
         } else {
-            for (size_t i = 0; i < cu_seq.size(); ++i) {
-                cu_seq[i] = i * seq;
+            for (size_t i = 0; i < batch + 1; ++i) {
+                cu_seq_ptr[i] = i * seq;
             }
         }
     }
 
-    void mha_cpu(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, int *cu_seq_q, int *cu_seq_k,
-                 size_t batch, size_t max_seq_q, size_t max_seq_k, bool is_causal, bool is_alibi) {
+    void mha_cpu(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, Tensor<int> *cu_seq_q,
+                 Tensor<int> *cu_seq_k, size_t max_seq_q, size_t max_seq_k, bool is_causal, bool is_alibi) {
         size_t total_q = Q->getShape()[0];
         size_t head_q = Q->getShape()[1];
         size_t dim = Q->getShape()[2];
         size_t head_k = K->getShape()[1];
+        size_t batch = cu_seq_q->getShape()[0] - 1;
 
         FAI_CHECK_EQ(head_q % head_k, 0);
         const size_t head_ratio = head_q / head_k;
@@ -188,23 +186,28 @@ private:
         half *v_ptr = V->getHostPtr();
         half *o_ptr = O->getHostPtr();
 
+        int *cu_seq_q_ptr = cu_seq_q->getHostPtr();
+        int *cu_seq_k_ptr = cu_seq_k->getHostPtr();
+
         // S = Q * K^T
         Tensor<float> *S = new Tensor<float>({total_q, head_q, max_seq_k}, "Tensor S");
         FAI_CHECK(S);
         float *s_ptr = S->getHostPtr();
         for (size_t b = 0; b < batch; ++b) {
-            size_t seq_q = cu_seq_q[b + 1] - cu_seq_q[b];
-            size_t seq_k = cu_seq_k[b + 1] - cu_seq_k[b];
+            size_t sum_seq_q = static_cast<size_t>(cu_seq_q_ptr[b]);
+            size_t sum_seq_k = static_cast<size_t>(cu_seq_k_ptr[b]);
+            size_t seq_q = static_cast<size_t>(cu_seq_q_ptr[b + 1]) - sum_seq_q;
+            size_t seq_k = static_cast<size_t>(cu_seq_k_ptr[b + 1]) - sum_seq_k;
             for (size_t h = 0; h < head_q; ++h) {
                 size_t h_k = h / head_ratio;
                 for (size_t sq = 0; sq < seq_q; ++sq) {
                     for (size_t sk = 0; sk < seq_k; ++sk) {
                         float tmp = 0.0;
                         for (size_t d = 0; d < dim; ++d) {
-                            tmp += __half2float(q_ptr[(cu_seq_q[b] + sq) * (head_q * dim) + h * dim + d]) *
-                                   __half2float(k_ptr[(cu_seq_k[b] + sk) * (head_k * dim) + h_k * dim + d]);
+                            tmp += __half2float(q_ptr[(sum_seq_q + sq) * (head_q * dim) + h * dim + d]) *
+                                   __half2float(k_ptr[(sum_seq_k + sk) * (head_k * dim) + h_k * dim + d]);
                         }
-                        s_ptr[cu_seq_q[b] * (head_q * seq_k) + sq * (head_q * seq_k) + h * seq_k + sk] = tmp;
+                        s_ptr[sum_seq_q * (head_q * seq_k) + sq * (head_q * seq_k) + h * seq_k + sk] = tmp;
                     }
                 }
             }
@@ -216,8 +219,10 @@ private:
         float *p_ptr = P->getHostPtr();
         float scale = 1.0 / std::sqrt(dim);
         for (size_t b = 0; b < batch; ++b) {
-            size_t seq_q = cu_seq_q[b + 1] - cu_seq_q[b];
-            size_t seq_k = cu_seq_k[b + 1] - cu_seq_k[b];
+            size_t sum_seq_q = static_cast<size_t>(cu_seq_q_ptr[b]);
+            size_t sum_seq_k = static_cast<size_t>(cu_seq_k_ptr[b]);
+            size_t seq_q = static_cast<size_t>(cu_seq_q_ptr[b + 1]) - sum_seq_q;
+            size_t seq_k = static_cast<size_t>(cu_seq_k_ptr[b + 1]) - sum_seq_k;
             size_t row_shift = seq_k - seq_q;
             for (size_t h = 0; h < head_q; ++h) {
                 float h_slope = is_alibi ? (1.0 / exp2(8.0 * (h + 1) / head_q)) : 0.0;
@@ -228,7 +233,7 @@ private:
                     std::vector<float> tmp_s(seq_k, 0.0);
                     float max_s = -std::numeric_limits<float>::max();
                     for (size_t sk = 0; sk < col_limit; ++sk) {
-                        tmp_s[sk] = s_ptr[(cu_seq_q[b] + sq) * (head_q * seq_k) + h * seq_k + sk] * scale;
+                        tmp_s[sk] = s_ptr[(sum_seq_q + sq) * (head_q * seq_k) + h * seq_k + sk] * scale;
                         if (is_alibi && sk < sq + row_shift) {
                             tmp_s[sk] +=
                                 (h_slope * (static_cast<int>(sk) - static_cast<int>(sq) - static_cast<int>(row_shift)));
@@ -245,13 +250,13 @@ private:
 
                     // Softmax(S)
                     for (size_t sk = 0; sk < col_limit; ++sk) {
-                        p_ptr[(cu_seq_q[b] + sq) * (head_q * seq_k) + h * seq_k + sk] = tmp_s[sk] / sum_s;
+                        p_ptr[(sum_seq_q + sq) * (head_q * seq_k) + h * seq_k + sk] = tmp_s[sk] / sum_s;
                     }
 
                     // Causal(S)
                     if (is_causal) {
                         for (size_t sk = col_limit; sk < seq_k; ++sk) {
-                            p_ptr[(cu_seq_q[b] + sq) * (head_q * seq_k) + h * seq_k + sk] = 0.0;
+                            p_ptr[(sum_seq_q + sq) * (head_q * seq_k) + h * seq_k + sk] = 0.0;
                         }
                     }
                 }
@@ -260,18 +265,20 @@ private:
 
         // O = P * V
         for (size_t b = 0; b < batch; ++b) {
-            size_t seq_q = cu_seq_q[b + 1] - cu_seq_q[b];
-            size_t seq_k = cu_seq_k[b + 1] - cu_seq_k[b];
+            size_t sum_seq_q = static_cast<size_t>(cu_seq_q_ptr[b]);
+            size_t sum_seq_k = static_cast<size_t>(cu_seq_k_ptr[b]);
+            size_t seq_q = static_cast<size_t>(cu_seq_q_ptr[b + 1]) - sum_seq_q;
+            size_t seq_k = static_cast<size_t>(cu_seq_k_ptr[b + 1]) - sum_seq_k;
             for (size_t h = 0; h < head_q; ++h) {
                 size_t h_k = h / head_ratio;
                 for (size_t sq = 0; sq < seq_q; ++sq) {
                     for (size_t d = 0; d < dim; ++d) {
                         float tmp = 0.0;
                         for (size_t sk = 0; sk < seq_k; ++sk) {
-                            tmp += p_ptr[(cu_seq_q[b] + sq) * (head_q * seq_k) + h * seq_k + sk] *
-                                   __half2float(v_ptr[(cu_seq_k[b] + sk) * (head_k * dim) + h_k * dim + d]);
+                            tmp += p_ptr[(sum_seq_q + sq) * (head_q * seq_k) + h * seq_k + sk] *
+                                   __half2float(v_ptr[(sum_seq_k + sk) * (head_k * dim) + h_k * dim + d]);
                         }
-                        o_ptr[(cu_seq_q[b] + sq) * (head_q * dim) + h * dim + d] = __float2half(tmp);
+                        o_ptr[(sum_seq_q + sq) * (head_q * dim) + h * dim + d] = __float2half(tmp);
                     }
                 }
             }
@@ -292,8 +299,8 @@ private:
     void profile(Func &&mha, const std::string &name) {
         m_cuda_timer.start();
         for (size_t i = 0; i < m_profiling_iterations; ++i) {
-            mha(m_Q, m_K, m_V, m_O, m_cu_seq_q_dev, m_cu_seq_k_dev, m_batch, m_seq_q, m_seq_k, m_is_causal,
-                m_num_splits, m_stream, m_dev_prop, m_is_alibi);
+            mha(m_Q, m_K, m_V, m_O, m_cu_seq_q, m_cu_seq_k, m_seq_q, m_seq_k, m_is_causal, m_num_splits, m_stream,
+                m_dev_prop, m_is_alibi);
         }
         m_profiling_time = static_cast<double>(m_cuda_timer.end()) / static_cast<double>(m_profiling_iterations);
 
@@ -351,10 +358,8 @@ private:
     Tensor<half> *m_O = nullptr;     // total_q * head_q * dim
     Tensor<half> *m_base = nullptr;  // total_q * head_q * dim, base result, init tensor O before each mha
 
-    std::vector<int> m_cu_seq_q;
-    int *m_cu_seq_q_dev = nullptr;
-    std::vector<int> m_cu_seq_k;
-    int *m_cu_seq_k_dev = nullptr;
+    Tensor<int> *m_cu_seq_q = nullptr;
+    Tensor<int> *m_cu_seq_k = nullptr;
 
     CudaTimer m_cuda_timer;
 

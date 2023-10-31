@@ -146,9 +146,9 @@ def analyze_data(data_path, dim_idx, data_type, y_step, x_label):
     data_throughput, data_performance = read_data(
         methods, dims, data_path, log_files, dim_idx)
     draw_line_chart(methods, dims, data_throughput, data_path + data_type +
-                    '_throughput.png', y_step, x_label, 'Throughput / TFLOPS', 'Flash Attention Throughput')
+                    '_throughput.png', y_step, x_label, 'Throughput / TFLOPS', 'MHA Throughput')
     draw_line_chart(methods, dims, data_performance, data_path + data_type + '_performance.png', y_step, x_label,
-                    'Performance Compared with Flash Attention / %', 'Flash Attention Performance')
+                    'Performance Compared with Flash Attention / %', 'MHA Performance')
 
 
 def main():

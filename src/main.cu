@@ -8,13 +8,15 @@
 #include "omp.h"
 #include "tester.h"
 
-#define MHA_FUNC(name)                                                                                               \
-    void name(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, int *cu_seq_q, int *cu_seq_k,      \
-              size_t batch, size_t max_seq_q, size_t max_seq_k, bool is_causal, int num_splits, cudaStream_t stream, \
-              cudaDeviceProp *dev_prop, bool is_alibi)
+#define MHA_FUNC(name)                                                                                   \
+    void name(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, Tensor<int> *cu_seq_q, \
+              Tensor<int> *cu_seq_k, size_t max_seq_q, size_t max_seq_k, bool is_causal, int num_splits, \
+              cudaStream_t stream, cudaDeviceProp *dev_prop, bool is_alibi)
 
 MHA_FUNC(flash_attn);
 MHA_FUNC(flash_attn_v2);
+
+MHA_FUNC(decoding_attn);
 
 DEFINE_uint32(b, 2, "batch size");
 DEFINE_uint32(sq, 256, "q seq len");
@@ -25,6 +27,7 @@ DEFINE_uint32(d, 128, "head dim");
 DEFINE_bool(is_causal, true, "causal mask");
 DEFINE_int32(num_splits, 0, "num splits of seq q len for flash attn");
 DEFINE_bool(is_alibi, false, "enable alibi");
+DEFINE_bool(is_decoding, false, "decoding only");
 DEFINE_bool(is_hybrid, false, "hybrid mode");
 DEFINE_uint32(prefill_fraction, 0, "percentage occupied by prefill in hybrid mode, the value ranges from 0 to 100");
 DEFINE_uint32(warmup_iterations, 1, "warmup iteration numbers and average the result");
@@ -88,16 +91,21 @@ int main(int argc, char *argv[]) {
         FLAGS_b, FLAGS_sq, FLAGS_hq, FLAGS_d, FLAGS_b, FLAGS_sk, FLAGS_hk, FLAGS_d, FLAGS_b, FLAGS_sk, FLAGS_hk,
         FLAGS_d, FLAGS_b, FLAGS_sq, FLAGS_hq, FLAGS_d);
     FLOG(
-        "Profiling: is causal: %d, num splits: %d, stream: %p, is alibi: %d, is hybrid: %d, prefill fraction: %u, "
-        "warmup iterations: %u, profiling iterations: %u, sleep duration: %u ms, enable check: %d",
-        FLAGS_is_causal, FLAGS_num_splits, stream, FLAGS_is_alibi, FLAGS_is_hybrid, FLAGS_prefill_fraction,
-        FLAGS_warmup_iterations, FLAGS_profiling_iterations, FLAGS_sleep_duration, FLAGS_enable_check);
+        "Profiling: is causal: %d, num splits: %d, stream: %p, is alibi: %d, is decoding: %d, is hybrid: %d, prefill "
+        "fraction: %u, warmup iterations: %u, profiling iterations: %u, sleep duration: %u ms, enable check: %d",
+        FLAGS_is_causal, FLAGS_num_splits, stream, FLAGS_is_alibi, FLAGS_is_decoding, FLAGS_is_hybrid,
+        FLAGS_prefill_fraction, FLAGS_warmup_iterations, FLAGS_profiling_iterations, FLAGS_sleep_duration,
+        FLAGS_enable_check);
 
     Tester tester(FLAGS_b, FLAGS_sq, FLAGS_sk, FLAGS_hq, FLAGS_hk, FLAGS_d, FLAGS_is_causal, FLAGS_num_splits, stream,
                   &dev_prop, FLAGS_is_alibi, FLAGS_is_hybrid, FLAGS_prefill_fraction, FLAGS_warmup_iterations,
                   FLAGS_profiling_iterations, FLAGS_sleep_duration, FLAGS_enable_check);
     tester.evaluate(flash_attn, "Flash-Attention");
     tester.evaluate(flash_attn_v2, "Flash-Attention-V2");
+
+    if (FLAGS_is_decoding) {
+        tester.evaluate(decoding_attn, "Decoding-Attention");
+    }
 
     GFLAGS_NAMESPACE::ShutDownCommandLineFlags();
 

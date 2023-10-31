@@ -73,9 +73,3 @@ inline const char *convert_SM_to_arch_name(int major, int minor) {
 
     return nGpuArchNameSM[index - 1].name;
 }
-
-inline void print_vector(const std::vector<int> &vec, const std::string &name = "Vector") {
-    for (size_t i = 0; i < vec.size(); ++i) {
-        FLOG("%s[%zu]: %d", name.c_str(), i, vec[i]);
-    }
-}
