@@ -8,6 +8,8 @@ O = Softmax(Q * K^T) * V
 
 In order to solve the problem of low Tensor Core utilization of Flash Attention in the decoding stage of LLM inference, refer to OpenPPL and Flash Attention, and use the handwritten Decoding Attention operator of CUDA Core for optimization. The calculation expression is as follows, where the precision of tensor Q, K, V and O is FP16. In most LLM inference decoding scenarios, the performance of Decoding Attention is better than Flash Attention and Flash Attention v2. In addition, Decoding Attention also supports GQA / MQA and ALiBi inference scenarios.
 
+The kv cache is quantized by int8 using per head method, which can save half of the GPU memory and reduce the cost of inference.
+
 ![mha_decoding](./media/images/mha_decoding.png)
 
 # Support
@@ -15,6 +17,7 @@ In order to solve the problem of low Tensor Core utilization of Flash Attention 
 - Hybrid Inference: Hybrid Inference by Prefill and Decoding
 - ALiBi Inference: Attention with Linear Biases
 - Decoding Attention: Self Multi Head Attention of Decoding Stage with CUDA Core
+- Decoding Attention Int8: Self Multi Head Attention of Decoding Stage with CUDA Core, and KV Cache is Quantized by Int8 Using per Head Method
 
 # Compile
 ## Environment

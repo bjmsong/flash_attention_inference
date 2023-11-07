@@ -17,6 +17,7 @@ MHA_FUNC(flash_attn);
 MHA_FUNC(flash_attn_v2);
 
 MHA_FUNC(decoding_attn);
+MHA_FUNC(decoding_attn_int8);
 
 DEFINE_uint32(b, 2, "batch size");
 DEFINE_uint32(sq, 256, "q seq len");
@@ -105,6 +106,7 @@ int main(int argc, char *argv[]) {
 
     if (FLAGS_is_decoding) {
         tester.evaluate(decoding_attn, "Decoding-Attention");
+        tester.evaluate(decoding_attn_int8, "Decoding-Attention-Int8");
     }
 
     GFLAGS_NAMESPACE::ShutDownCommandLineFlags();

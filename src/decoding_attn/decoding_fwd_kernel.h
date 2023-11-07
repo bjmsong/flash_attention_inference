@@ -57,6 +57,7 @@ __global__ void mha_decoding_fwd_kernel(const DecodingParams params) {
         size_t seqlen_k = base_seqlen_k + group_id;
         half RK[thread_elem_nums];
 
+        float tmp = 0.0;
         if (seqlen_k >= binfo.actual_seqlen_k) {
             memset(RK, 0, sizeof(RK));
         } else {
@@ -66,12 +67,11 @@ __global__ void mha_decoding_fwd_kernel(const DecodingParams params) {
                     *(int4 *)(&params.k_ptr[binfo.k_offset(seqlen_k, params.k_row_stride, params.k_head_stride,
                                                            (i * group_size + group_lane_id) * thread_copy_elem_nums)]);
             }
-        }
 
-        float tmp = 0.0;
 #pragma unroll
-        for (size_t i = 0; i < thread_elem_nums; ++i) {
-            tmp += (__half2float(RQ[i]) * __half2float(RK[i]));
+            for (size_t i = 0; i < thread_elem_nums; ++i) {
+                tmp += (__half2float(RQ[i]) * __half2float(RK[i]));
+            }
         }
 
 #pragma unroll
