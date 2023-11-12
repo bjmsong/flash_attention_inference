@@ -1,6 +1,6 @@
 // Copyright 2023. All Rights Reserved.
 // Author: Bruce-Lee-LY
-// Date: 21:14:13 on Tue, Oct 31, 2023
+// Date: 21:17:12 on Sun, Nov 12, 2023
 //
 // Description: block info
 
@@ -8,9 +8,9 @@
 
 #include "cuda_runtime_api.h"
 
-struct DecodingBlockInfo {
+struct DecodingFP8BlockInfo {
     template <typename Params>
-    __device__ DecodingBlockInfo(const Params &params, const int bidb, const int bidh)
+    __device__ DecodingFP8BlockInfo(const Params &params, const int bidb, const int bidh)
         : b(bidb),
           h(bidh),
           h_k(h / params.h_h_k_ratio),

@@ -18,6 +18,10 @@ MHA_FUNC(flash_attn_v2);
 
 MHA_FUNC(decoding_attn);
 MHA_FUNC(decoding_attn_int8);
+#ifdef FAI_ENABLE_FP8
+MHA_FUNC(decoding_attn_fp8e5m2);
+MHA_FUNC(decoding_attn_fp8e4m3);
+#endif
 
 DEFINE_uint32(b, 2, "batch size");
 DEFINE_uint32(sq, 256, "q seq len");
@@ -107,6 +111,10 @@ int main(int argc, char *argv[]) {
     if (FLAGS_is_decoding) {
         tester.evaluate(decoding_attn, "Decoding-Attention");
         tester.evaluate(decoding_attn_int8, "Decoding-Attention-Int8");
+#ifdef FAI_ENABLE_FP8
+        tester.evaluate(decoding_attn_fp8e5m2, "Decoding-Attention-FP8E5M2");
+        tester.evaluate(decoding_attn_fp8e4m3, "Decoding-Attention-FP8E4M3");
+#endif
     }
 
     GFLAGS_NAMESPACE::ShutDownCommandLineFlags();

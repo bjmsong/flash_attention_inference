@@ -10,6 +10,14 @@
 #include "logging.h"
 #include "util.h"
 
+#if ((__CUDACC_VER_MAJOR__ == 11) && (__CUDACC_VER_MINOR__ >= 8)) || (__CUDACC_VER_MAJOR__ > 11)
+#define FAI_ENABLE_FP8
+#endif
+
+#ifdef FAI_ENABLE_FP8
+#include "cuda_fp8.h"
+#endif
+
 #define FAI_LIKELY(x) __builtin_expect(!!(x), 1)
 #define FAI_UNLIKELY(x) __builtin_expect(!!(x), 0)
 

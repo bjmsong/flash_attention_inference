@@ -99,8 +99,10 @@ __global__ void quantization_int8_kernel(const DecodingInt8Params params) {
                     *(int2 *)(&RQV[i * thread_copy_elem_nums]);
             }
 
-            params.k_scale_ptr[binfo.k_scale_offset(params.h_k, h_idx)] = k_scale;
-            params.v_scale_ptr[binfo.k_scale_offset(params.h_k, h_idx)] = v_scale;
+            if (group_lane_id == 0) {
+                params.k_scale_ptr[binfo.k_scale_offset(params.h_k, h_idx)] = k_scale;
+                params.v_scale_ptr[binfo.k_scale_offset(params.h_k, h_idx)] = v_scale;
+            }
         }
     }
 }
