@@ -8,6 +8,7 @@ cmake_minimum_required (VERSION 3.12)
 
 project (flash_attention_inference LANGUAGES C CXX CUDA)
 
+# 控制生成的 Makefile 是否输出详细信息
 set (CMAKE_VERBOSE_MAKEFILE ${FAI_VERBOSE_MAKEFILE})
 
 set (CMAKE_C_FLAGS "-std=c17")
@@ -62,6 +63,7 @@ link_directories (
     ${SYS_CUDA_DRIVER_PATH}
 )
 
+# 将指定目录中的所有符合模式的文件的列表保存到变量FAI_SRCS
 file (GLOB FAI_SRCS 
     ${PROJECT_SOURCE_DIR}/src/*.cu
     ${PROJECT_SOURCE_DIR}/src/flash_attn/*.cu
@@ -72,6 +74,7 @@ file (GLOB FAI_SRCS
 )
 
 cuda_add_executable (flash_attention_inference ${FAI_SRCS})
+# 链接OpenMP、gflags库
 target_link_libraries (flash_attention_inference OpenMP::OpenMP_CXX ${GFLAGS_LIBRARIES})
-
+# 安装可执行文件（flash_attention_inference）到bin/路径
 install (TARGETS flash_attention_inference RUNTIME DESTINATION bin)
