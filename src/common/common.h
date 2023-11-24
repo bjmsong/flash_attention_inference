@@ -19,6 +19,8 @@
 #endif
 
 #define FAI_LIKELY(x) __builtin_expect(!!(x), 1)
+// 内置函数__builtin_expect提示编译器: 条件 x 的概率较小，帮助编译器优化代码
+// !!(x) 将 x 转换为布尔值
 #define FAI_UNLIKELY(x) __builtin_expect(!!(x), 0)
 
 #define FAI_CHECK(x)                      \

@@ -1,0 +1,14 @@
+{
+    "clangd.fallbackFlags": [
+        "-std=c++17",
+        "-I${workspaceFolder}", // 项目根目录
+        "-I${workspaceFolder}/src",
+        "-I${workspaceFolder}/src/common",
+        "-I${workspaceFolder}/third_party",
+        "-I/usr/lib/llvm-10/include/c++/v1",
+        "-I/usr/local/cuda-11.8/targets/x86_64-linux/include",
+        "-I/usr/include/c++/9",
+        "-I/usr/include/x86_64-linux-gnu/c++/9",
+        "--gcc-toolchain=/usr/local/bin/gcc"
+      ]
+}

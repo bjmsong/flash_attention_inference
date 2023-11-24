@@ -104,6 +104,7 @@ void run_fmha_fwd(Launch_params<FMHA_fprop_params> &launch_params) {
     } else if (launch_params.params.d <= 128) {
         run_fmha_fwd_hdim128(launch_params);
     }
+    // hidden size > 128 呢？
 }
 
 void flash_attn(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, Tensor<int> *cu_seq_q,

@@ -68,11 +68,13 @@ public:
         FAI_CHECK(m_V);
         m_O = new Tensor<half>({m_total_q, m_head_q, m_dim}, "Tensor O");
         FAI_CHECK(m_O);
-        m_base = new Tensor<half>({m_total_q, m_head_q, m_dim}, "Tensor Base");
+        m_base = new Tensor<half>({m_total_q, m_head_q, m_dim}, "Tensor Base");  // CPU上计算的output
         FAI_CHECK(m_base);
 
+        // 按batch记录累积的seq length: m_cu_seq_q[b] = (b-1) * seq_len_q 
         m_cu_seq_q = new Tensor<int>({m_batch + 1}, "Tensor cu_seq_q");
         FAI_CHECK(m_cu_seq_q);
+        // m_cu_seq_k[b] = (b-1) * seq_len_k
         m_cu_seq_k = new Tensor<int>({m_batch + 1}, "Tensor cu_seq_k");
         FAI_CHECK(m_cu_seq_k);
 
@@ -170,15 +172,47 @@ private:
         }
     }
 
+    /*
+    For Decoding:
+    Params：
+        Q: {batch * query_seq_len, head_num, dim}, query_seq_len = 1
+        K/V: {batch * history_seq_len, head_num, dim}
+        O: {batch*query_seq_len, head_num, dim} 
+        cu_seq_q：
+        cu_seq_k：
+        max_seq_q:
+        max_seq_k: max seq length of Key Cache allowed
+        is_causal：if true, using causal mask
+        is_alibi：if true, using alibi positional encoding
+
+    1. S = Q*K^T
+        1.1 Reshape:
+        Q -> {batch * head_num, query_seq_len, dim}
+        K -> {batch * head_num, history_seq_len, dim}
+        1.2 K -> K^T
+        1.3 batch GEMM
+        {batch * head_num, query_seq_len, dim} * {batch*head_num, dim, history_seq_len} =  (batch * head_num, query_seq_len, history_seq_len)
+            for (i = 0 ; i< batch * head_num; i++)
+                for (j = 0; j < query_seq_len; j++) 
+                    for (k = 0; k < history_seq_len; k++) 
+                        for (l = 0; l < dim; l++)
+                            S[i*batch * head_num + j * history_seq_len + k] = Q[i*batch * head_num + j*dim + l] * \
+                                            K^T[i*batch * head_num + l*history_seq_len + k]
+    2. P = Softmax(S)
+       2.1 positional encoding
+       2.2 Softmax
+       2.3 mask
+    3. P * V
+    */
     void mha_cpu(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, Tensor<int> *cu_seq_q,
                  Tensor<int> *cu_seq_k, size_t max_seq_q, size_t max_seq_k, bool is_causal, bool is_alibi) {
-        size_t total_q = Q->getShape()[0];
+        size_t total_q = Q->getShape()[0];  // batch*query_seq_len
         size_t head_q = Q->getShape()[1];
         size_t dim = Q->getShape()[2];
         size_t head_k = K->getShape()[1];
         size_t batch = cu_seq_q->getShape()[0] - 1;
 
-        FAI_CHECK_EQ(head_q % head_k, 0);
+        FAI_CHECK_EQ(head_q % head_k, 0);  // GQA：一个key head对应多个query head （节省key cahche空间）
         const size_t head_ratio = head_q / head_k;
 
         half *q_ptr = Q->getHostPtr();
@@ -189,7 +223,7 @@ private:
         int *cu_seq_q_ptr = cu_seq_q->getHostPtr();
         int *cu_seq_k_ptr = cu_seq_k->getHostPtr();
 
-        // S = Q * K^T
+        // 1. S = Q * K^T
         Tensor<float> *S = new Tensor<float>({total_q, head_q, max_seq_k}, "Tensor S");
         FAI_CHECK(S);
         float *s_ptr = S->getHostPtr();
@@ -213,7 +247,7 @@ private:
             }
         }
 
-        // P = Softmax(S)
+        // 2. P = Softmax(S)
         Tensor<float> *P = new Tensor<float>({total_q, head_q, max_seq_k}, "Tensor P");
         FAI_CHECK(P);
         float *p_ptr = P->getHostPtr();
@@ -263,7 +297,7 @@ private:
             }
         }
 
-        // O = P * V
+        // 3. O = P * V
         for (size_t b = 0; b < batch; ++b) {
             size_t sum_seq_q = static_cast<size_t>(cu_seq_q_ptr[b]);
             size_t sum_seq_k = static_cast<size_t>(cu_seq_k_ptr[b]);

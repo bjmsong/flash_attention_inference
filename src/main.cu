@@ -8,6 +8,7 @@
 #include "omp.h"
 #include "tester.h"
 
+// 声明一堆function
 #define MHA_FUNC(name)                                                                                   \
     void name(Tensor<half> *Q, Tensor<half> *K, Tensor<half> *V, Tensor<half> *O, Tensor<int> *cu_seq_q, \
               Tensor<int> *cu_seq_k, size_t max_seq_q, size_t max_seq_k, bool is_causal, int num_splits, \
@@ -33,7 +34,7 @@ DEFINE_bool(is_causal, true, "causal mask");
 DEFINE_int32(num_splits, 0, "num splits of seq q len for flash attn");
 DEFINE_bool(is_alibi, false, "enable alibi");
 DEFINE_bool(is_decoding, false, "decoding only");
-DEFINE_bool(is_hybrid, false, "hybrid mode");
+DEFINE_bool(is_hybrid, false, "hybrid mode");  // prefill + decoding
 DEFINE_uint32(prefill_fraction, 0, "percentage occupied by prefill in hybrid mode, the value ranges from 0 to 100");
 DEFINE_uint32(warmup_iterations, 1, "warmup iteration numbers and average the result");
 DEFINE_uint32(profiling_iterations, 10, "profiling iteration numbers and average the result");
